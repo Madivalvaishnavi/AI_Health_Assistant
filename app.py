@@ -112,8 +112,24 @@ elif menu == "Fitness Tracker":
 
     st.write("💧 Water Intake:", get_water(), "L")
 
-# ---------------- HEALTH CHATBOT ----------------
-
 elif menu == "Health Chatbot":
 
-    st.header("🤖")
+    st.header("🤖 Health Chatbot")
+
+    question = st.text_input("Ask your health question")
+
+    if st.button("Ask"):
+        answer = health_chatbot(question)
+        st.success(answer)
+
+
+# ---------------- LOGOUT ----------------
+
+elif menu == "Logout":
+
+    st.session_state.logged_in = False
+    st.session_state.page = "Login"
+
+    st.success("Logged out successfully!")
+
+    st.rerun()

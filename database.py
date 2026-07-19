@@ -9,7 +9,6 @@ dosage TEXT,
 time TEXT
 )
 """)
-
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS fitness(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,7 +17,12 @@ calories INTEGER,
 water REAL
 )
 """)
-
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT)
+""")
 connection.commit()
 connection.close()
 print("Database Created Successfully")
