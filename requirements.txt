@@ -2,4 +2,5 @@ streamlit
 pandas
 plotly
 langchain
-google-generativeai
+google-genai
+matplotlib
