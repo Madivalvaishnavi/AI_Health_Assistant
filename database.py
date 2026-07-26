@@ -26,3 +26,15 @@ cursor.execute("""
 connection.commit()
 connection.close()
 print("Database Created Successfully")
+
+def view_fitness():
+    connection = sqlite3.connect("health.db")
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT * FROM fitness")
+
+    fitness_data = cursor.fetchall()
+
+    connection.close()
+
+    return fitness_data

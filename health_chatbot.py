@@ -1,10 +1,17 @@
-def health_chatbot(question):
+from google import genai
+
+
+def health_chatbot(question, api_key=None):
     """
-    Returns a simple response based on the user's health question.
+    Returns a response to the user's health question.
+
+    First checks predefined responses.
+    If no predefined response is found, uses Gemini AI.
     """
 
     question = question.lower().strip()
 
+    # Existing predefined responses
     if "fever" in question:
         return "Drink plenty of water, take proper rest, and consult a doctor if the fever continues."
 
@@ -38,5 +45,42 @@ def health_chatbot(question):
     elif "hello" in question or "hi" in question:
         return "Hello! How can I help you with your health today?"
 
+    # If no predefined response is found, use Gemini AI
     else:
-        return "Sorry, I don't have information about that. Please consult a healthcare professional for medical advice."
+
+        if not api_key:
+            return "Sorry, I don't have information about that. Please consult a healthcare professional for medical advice."
+
+        try:
+
+            client = genai.Client(
+                api_key=api_key
+            )
+
+            prompt = f"""
+You are an AI Health Assistant for a student project.
+
+Answer the user's question with general health and wellness information.
+
+Important rules:
+- Do not diagnose diseases.
+- Do not prescribe medicines.
+- Do not recommend changing medication doses.
+- For serious symptoms, emergencies, or personal medical concerns,
+  advise the user to consult a qualified healthcare professional.
+- Keep the answer simple and easy to understand.
+
+User's question:
+{question}
+"""
+
+            response = client.models.generate_content(
+                model="gemini-3.5-flash",
+                contents=prompt
+            )
+
+            return response.text
+
+        except Exception as e:
+
+            return f"AI Error: {str(e)}"

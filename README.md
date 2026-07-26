@@ -62,6 +62,5 @@ streamlit run app.py
 - Health Reports and Charts
 - AI-powered Medical Suggestions
 
-## Author
-
+## 
 Madival Vaishnavi
