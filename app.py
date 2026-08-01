@@ -1,4 +1,5 @@
 import streamlit as st
+import sqlite3
 
 from medicine import add_medicine, view_medicines
 from health_chatbot import health_chatbot
@@ -6,12 +7,21 @@ from health_api import get_steps, get_calories, get_water
 from user import register_user, login_user
 
 from database import view_fitness
-from health_analysis import analyze_fitness_data, create_fitness_chart
 
-from medication_interaction import check_medication_interaction
-from health_report import generate_health_report
+from health_analysis import (
+    analyze_fitness_data,
+    create_fitness_chart
+)
 
-# Health Data Import / Export
+from health_goals import (
+    get_health_goal_progress,
+    get_goal_status
+)
+
+from health_report import (
+    generate_health_report
+)
+
 from health_data_formats import (
     export_json,
     export_csv,
@@ -21,13 +31,6 @@ from health_data_formats import (
     import_xml
 )
 
-# Health Goals
-from health_goals import (
-    calculate_progress,
-    get_goal_status,
-    get_health_goal_progress
-)
-
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -35,11 +38,14 @@ from health_goals import (
 
 st.set_page_config(
     page_title="AI Health Assistant",
-    page_icon="🩺"
+    page_icon="🩺",
+    layout="wide"
 )
 
 st.title("🩺 AI Personal Health Assistant")
-st.write("Welcome to your AI Health Assistant!")
+st.write(
+    "Welcome to your AI-powered personal health monitoring assistant!"
+)
 
 
 # ============================================================
@@ -59,13 +65,13 @@ if "logged_in" not in st.session_state:
 
 if not st.session_state.logged_in:
 
-    # ========================================================
+    # --------------------------------------------------------
     # REGISTER
-    # ========================================================
+    # --------------------------------------------------------
 
     if st.session_state.page == "Register":
 
-        st.header("👤 User Registration")
+        st.header("📝 User Registration")
 
         username = st.text_input(
             "Username"
@@ -76,9 +82,11 @@ if not st.session_state.logged_in:
             type="password"
         )
 
-        if st.button("Register"):
+        if st.button(
+            "Register"
+        ):
 
-            if username and password:
+            if username.strip() and password.strip():
 
                 if register_user(
                     username,
@@ -105,16 +113,19 @@ if not st.session_state.logged_in:
                     "Please enter username and password."
                 )
 
-        if st.button("Go to login"):
+
+        if st.button(
+            "Go to Login"
+        ):
 
             st.session_state.page = "Login"
 
             st.rerun()
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # LOGIN
-    # ========================================================
+    # --------------------------------------------------------
 
     elif st.session_state.page == "Login":
 
@@ -129,7 +140,9 @@ if not st.session_state.logged_in:
             type="password"
         )
 
-        if st.button("Login"):
+        if st.button(
+            "Login"
+        ):
 
             user = login_user(
                 username,
@@ -152,29 +165,32 @@ if not st.session_state.logged_in:
                     "Invalid Username or Password"
                 )
 
-        if st.button("Go to Register"):
+
+        if st.button(
+            "Go to Register"
+        ):
 
             st.session_state.page = "Register"
 
             st.rerun()
 
+
     st.stop()
 
 
 # ============================================================
-# SIDEBAR MENU
+# SIDEBAR
 # ============================================================
 
 menu = st.sidebar.selectbox(
-    "Choose Option",
+    "🩺 Choose Option",
     [
         "Home",
         "Medication Tracker",
         "Fitness Tracker",
         "Health Goals",
-        "Medication Interaction Checker",
         "Health Report",
-        "Health Data Import/Export",
+        "Health Data",
         "Health Chatbot",
         "Logout"
     ]
@@ -182,25 +198,283 @@ menu = st.sidebar.selectbox(
 
 
 # ============================================================
-# HOME
+# HOME DASHBOARD
 # ============================================================
 
 if menu == "Home":
 
-    st.header("🏠 Dashboard")
+    st.header(
+        "🏠 Health Monitoring Dashboard"
+    )
 
     st.write(
-        "Welcome to AI Personal Health Assistant!"
+        "Your complete health overview in one place."
     )
 
-    st.info(
-        "Use the sidebar to track your medication, "
-        "monitor fitness data, set health goals, "
-        "check medication interactions, "
-        "generate health reports, "
-        "import/export health data, "
-        "and ask the AI Health Chatbot questions."
+
+    # --------------------------------------------------------
+    # GET CURRENT FITNESS DATA
+    # --------------------------------------------------------
+
+    steps = get_steps()
+
+    calories = get_calories()
+
+    water = get_water()
+
+
+    # --------------------------------------------------------
+    # GET SAVED DATA
+    # --------------------------------------------------------
+
+    fitness_data = view_fitness()
+
+    medicines = view_medicines()
+
+
+    # --------------------------------------------------------
+    # FITNESS SUMMARY
+    # --------------------------------------------------------
+
+    st.subheader(
+        "📊 Today's Health Summary"
     )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+
+    with col1:
+
+        st.metric(
+            "👣 Steps",
+            steps
+        )
+
+
+    with col2:
+
+        st.metric(
+            "🔥 Calories",
+            calories
+        )
+
+
+    with col3:
+
+        st.metric(
+            "💧 Water",
+            f"{water} L"
+        )
+
+
+    with col4:
+
+        st.metric(
+            "💊 Medicines",
+            len(medicines)
+        )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # HEALTH GOALS
+    # --------------------------------------------------------
+
+    st.subheader(
+        "🎯 Daily Health Goals"
+    )
+
+
+    # Default goals
+
+    steps_goal = 10000
+
+    water_goal = 3
+
+    calories_goal = 500
+
+
+    progress = get_health_goal_progress(
+        steps,
+        steps_goal,
+        water,
+        water_goal,
+        calories,
+        calories_goal
+    )
+
+
+    # --------------------------------------------------------
+    # GOAL PROGRESS COLUMNS
+    # --------------------------------------------------------
+
+    col1, col2, col3 = st.columns(3)
+
+
+    with col1:
+
+        st.write(
+            "👣 Steps Goal"
+        )
+
+        st.progress(
+            int(progress["steps"]) / 100
+        )
+
+        st.write(
+            f"{progress['steps']:.1f}% completed"
+        )
+
+        st.caption(
+            get_goal_status(
+                steps,
+                steps_goal
+            )
+        )
+
+
+    with col2:
+
+        st.write(
+            "💧 Water Goal"
+        )
+
+        st.progress(
+            int(progress["water"]) / 100
+        )
+
+        st.write(
+            f"{progress['water']:.1f}% completed"
+        )
+
+        st.caption(
+            get_goal_status(
+                water,
+                water_goal
+            )
+        )
+
+
+    with col3:
+
+        st.write(
+            "🔥 Calories Goal"
+        )
+
+        st.progress(
+            int(progress["calories"]) / 100
+        )
+
+        st.write(
+            f"{progress['calories']:.1f}% completed"
+        )
+
+        st.caption(
+            get_goal_status(
+                calories,
+                calories_goal
+            )
+        )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # HEALTH ANALYSIS
+    # --------------------------------------------------------
+
+    st.subheader(
+        "💡 Health Insights"
+    )
+
+
+    if fitness_data:
+
+        analysis, insights = analyze_fitness_data(
+            fitness_data
+        )
+
+        for insight in insights:
+
+            st.info(
+                insight
+            )
+
+    else:
+
+        st.info(
+            "Add fitness data to receive health insights."
+        )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # MEDICATION SUMMARY
+    # --------------------------------------------------------
+
+    st.subheader(
+        "💊 Medication Summary"
+    )
+
+
+    if medicines:
+
+        st.write(
+            f"You currently have "
+            f"**{len(medicines)} medicine(s)** saved."
+        )
+
+        for medicine in medicines:
+
+            st.write(
+                f"💊 {medicine[1]} | "
+                f"Dosage: {medicine[2]} | "
+                f"Time: {medicine[3]}"
+            )
+
+    else:
+
+        st.info(
+            "No medicines have been saved yet."
+        )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # QUICK HEALTH REPORT
+    # --------------------------------------------------------
+
+    st.subheader(
+        "📄 Health Report"
+    )
+
+
+    if fitness_data:
+
+        report = generate_health_report(
+            fitness_data,
+            medicines
+        )
+
+        st.download_button(
+            label="📥 Download Health Report",
+            data=report,
+            file_name="health_report.txt",
+            mime="text/plain"
+        )
+
+    else:
+
+        st.info(
+            "Add fitness data to generate your health report."
+        )
 
 
 # ============================================================
@@ -209,7 +483,10 @@ if menu == "Home":
 
 elif menu == "Medication Tracker":
 
-    st.header("💊 Medication Tracker")
+    st.header(
+        "💊 Medication Tracker"
+    )
+
 
     medicine_name = st.text_input(
         "Medicine Name"
@@ -223,9 +500,16 @@ elif menu == "Medication Tracker":
         "Time"
     )
 
-    if st.button("Save Medicine"):
 
-        if medicine_name and dosage and time:
+    if st.button(
+        "Save Medicine"
+    ):
+
+        if (
+            medicine_name.strip()
+            and dosage.strip()
+            and time.strip()
+        ):
 
             add_medicine(
                 medicine_name,
@@ -250,14 +534,18 @@ elif menu == "Medication Tracker":
         "📋 Saved Medicines"
     )
 
+
     medicines = view_medicines()
+
 
     if medicines:
 
         for medicine in medicines:
 
             st.write(
-                medicine
+                f"💊 {medicine[1]} | "
+                f"Dosage: {medicine[2]} | "
+                f"Time: {medicine[3]}"
             )
 
     else:
@@ -273,16 +561,19 @@ elif menu == "Medication Tracker":
 
 elif menu == "Fitness Tracker":
 
-    st.header("🏃 Fitness Tracker")
+    st.header(
+        "🏃 Fitness Tracker"
+    )
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # ENTER FITNESS DATA
-    # ========================================================
+    # --------------------------------------------------------
 
     st.subheader(
         "📝 Enter Your Fitness Data"
     )
+
 
     steps_input = st.number_input(
         "👣 Steps",
@@ -290,11 +581,13 @@ elif menu == "Fitness Tracker":
         step=100
     )
 
+
     calories_input = st.number_input(
         "🔥 Calories Burned",
         min_value=0,
         step=10
     )
+
 
     water_input = st.number_input(
         "💧 Water Intake (Liters)",
@@ -303,19 +596,20 @@ elif menu == "Fitness Tracker":
     )
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # SAVE FITNESS DATA
-    # ========================================================
+    # --------------------------------------------------------
 
-    if st.button("Save Fitness Data"):
-
-        import sqlite3
+    if st.button(
+        "Save Fitness Data"
+    ):
 
         connection = sqlite3.connect(
             "health.db"
         )
 
         cursor = connection.cursor()
+
 
         cursor.execute(
             """
@@ -330,9 +624,11 @@ elif menu == "Fitness Tracker":
             )
         )
 
+
         connection.commit()
 
         connection.close()
+
 
         st.success(
             "Fitness data saved successfully!"
@@ -341,45 +637,59 @@ elif menu == "Fitness Tracker":
         st.rerun()
 
 
-    # ========================================================
-    # CURRENT FITNESS VALUES
-    # ========================================================
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # CURRENT FITNESS DATA
+    # --------------------------------------------------------
 
     st.subheader(
         "📊 Current Fitness Data"
     )
 
-    st.write(
-        "👣 Steps:",
-        get_steps()
-    )
 
-    st.write(
-        "🔥 Calories:",
-        get_calories()
-    )
-
-    st.write(
-        "💧 Water Intake:",
-        get_water(),
-        "L"
-    )
+    col1, col2, col3 = st.columns(3)
 
 
-    # ========================================================
-    # FITNESS RECORDS
-    # ========================================================
+    with col1:
+
+        st.metric(
+            "👣 Steps",
+            get_steps()
+        )
+
+
+    with col2:
+
+        st.metric(
+            "🔥 Calories",
+            get_calories()
+        )
+
+
+    with col3:
+
+        st.metric(
+            "💧 Water",
+            f"{get_water()} L"
+        )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # FITNESS ANALYSIS
+    # --------------------------------------------------------
 
     fitness_data = view_fitness()
 
 
-    # ========================================================
-    # HEALTH DATA ANALYSIS
-    # ========================================================
-
     st.subheader(
         "📈 Health Data Analysis"
     )
+
 
     if fitness_data:
 
@@ -388,11 +698,8 @@ elif menu == "Fitness Tracker":
         )
 
 
-        # ====================================================
-        # AVERAGE VALUES
-        # ====================================================
-
         col1, col2, col3 = st.columns(3)
+
 
         with col1:
 
@@ -401,12 +708,14 @@ elif menu == "Fitness Tracker":
                 analysis["average_steps"]
             )
 
+
         with col2:
 
             st.metric(
                 "Average Calories",
                 analysis["average_calories"]
             )
+
 
         with col3:
 
@@ -416,13 +725,10 @@ elif menu == "Fitness Tracker":
             )
 
 
-        # ====================================================
-        # HEALTH INSIGHTS
-        # ====================================================
-
         st.subheader(
             "💡 Health Insights"
         )
+
 
         for insight in insights:
 
@@ -431,17 +737,15 @@ elif menu == "Fitness Tracker":
             )
 
 
-        # ====================================================
-        # VISUALIZATION
-        # ====================================================
-
         st.subheader(
             "📊 Steps Progress"
         )
 
+
         chart = create_fitness_chart(
             fitness_data
         )
+
 
         if chart:
 
@@ -450,13 +754,10 @@ elif menu == "Fitness Tracker":
             )
 
 
-        # ====================================================
-        # SAVED RECORDS
-        # ====================================================
-
         st.subheader(
             "📋 Saved Fitness Records"
         )
+
 
         for record in fitness_data:
 
@@ -464,12 +765,11 @@ elif menu == "Fitness Tracker":
                 record
             )
 
+
     else:
 
         st.info(
-            "No fitness records found yet. "
-            "Enter your fitness data above and click "
-            "'Save Fitness Data' to start your health analysis."
+            "No fitness records found yet."
         )
 
 
@@ -480,21 +780,16 @@ elif menu == "Fitness Tracker":
 elif menu == "Health Goals":
 
     st.header(
-        "🎯 Health Goal Setting & Progress Tracking"
+        "🎯 Health Goals"
     )
+
 
     st.write(
-        "Set your daily health goals and track your progress."
+        "Track your progress toward your daily health goals."
     )
 
 
-    # ========================================================
-    # SET DAILY GOALS
-    # ========================================================
-
-    st.subheader(
-        "🎯 Set Your Daily Goals"
-    )
+    # Default goals
 
     steps_goal = st.number_input(
         "👣 Daily Steps Goal",
@@ -503,12 +798,14 @@ elif menu == "Health Goals":
         step=500
     )
 
+
     water_goal = st.number_input(
         "💧 Daily Water Goal (Liters)",
         min_value=0.1,
         value=3.0,
         step=0.1
     )
+
 
     calories_goal = st.number_input(
         "🔥 Daily Calories Goal",
@@ -518,227 +815,77 @@ elif menu == "Health Goals":
     )
 
 
-    # ========================================================
-    # SAVE GOALS
-    # ========================================================
+    steps = get_steps()
+
+    water = get_water()
+
+    calories = get_calories()
+
 
     if st.button(
-        "💾 Save Health Goals"
+        "Calculate Goal Progress"
     ):
-
-        st.session_state.steps_goal = steps_goal
-
-        st.session_state.water_goal = water_goal
-
-        st.session_state.calories_goal = calories_goal
-
-        st.success(
-            "Health goals saved successfully!"
-        )
-
-
-    # ========================================================
-    # DEFAULT GOALS
-    # ========================================================
-
-    if "steps_goal" not in st.session_state:
-
-        st.session_state.steps_goal = steps_goal
-
-    if "water_goal" not in st.session_state:
-
-        st.session_state.water_goal = water_goal
-
-    if "calories_goal" not in st.session_state:
-
-        st.session_state.calories_goal = calories_goal
-
-
-    # ========================================================
-    # GET FITNESS DATA
-    # ========================================================
-
-    fitness_data = view_fitness()
-
-
-    if fitness_data:
-
-        # Get latest fitness record
-        latest_record = fitness_data[-1]
-
-        current_steps = latest_record[1]
-
-        current_calories = latest_record[2]
-
-        current_water = latest_record[3]
-
-
-        # ====================================================
-        # CALCULATE GOAL PROGRESS
-        # ====================================================
 
         progress = get_health_goal_progress(
-
-            current_steps,
-
-            st.session_state.steps_goal,
-
-            current_water,
-
-            st.session_state.water_goal,
-
-            current_calories,
-
-            st.session_state.calories_goal
-
+            steps,
+            steps_goal,
+            water,
+            water_goal,
+            calories,
+            calories_goal
         )
 
-
-        # ====================================================
-        # STEPS PROGRESS
-        # ====================================================
 
         st.subheader(
-            "👣 Steps Progress"
-        )
-
-        st.write(
-            f"**Goal:** {st.session_state.steps_goal:,} steps"
-        )
-
-        st.write(
-            f"**Current:** {current_steps:,} steps"
-        )
-
-        st.write(
-            f"**Progress:** {progress['steps']:.1f}%"
-        )
-
-        st.progress(
-            progress["steps"] / 100
-        )
-
-        st.info(
-            get_goal_status(
-                current_steps,
-                st.session_state.steps_goal
-            )
+            "📊 Your Progress"
         )
 
 
-        # ====================================================
-        # WATER PROGRESS
-        # ====================================================
-
-        st.subheader(
-            "💧 Water Progress"
-        )
-
-        st.write(
-            f"**Goal:** {st.session_state.water_goal:.1f} L"
-        )
-
-        st.write(
-            f"**Current:** {current_water:.1f} L"
-        )
-
-        st.write(
-            f"**Progress:** {progress['water']:.1f}%"
-        )
-
-        st.progress(
-            progress["water"] / 100
-        )
-
-        st.info(
-            get_goal_status(
-                current_water,
-                st.session_state.water_goal
-            )
-        )
+        col1, col2, col3 = st.columns(3)
 
 
-        # ====================================================
-        # CALORIES PROGRESS
-        # ====================================================
+        with col1:
 
-        st.subheader(
-            "🔥 Calories Progress"
-        )
-
-        st.write(
-            f"**Goal:** {st.session_state.calories_goal:,} calories"
-        )
-
-        st.write(
-            f"**Current:** {current_calories:,} calories"
-        )
-
-        st.write(
-            f"**Progress:** {progress['calories']:.1f}%"
-        )
-
-        st.progress(
-            progress["calories"] / 100
-        )
-
-        st.info(
-            get_goal_status(
-                current_calories,
-                st.session_state.calories_goal
-            )
-        )
-
-
-    else:
-
-        st.warning(
-            "No fitness data available. "
-            "Please save your fitness data first."
-        )
-
-
-# ============================================================
-# MEDICATION INTERACTION CHECKER
-# ============================================================
-
-elif menu == "Medication Interaction Checker":
-
-    st.header(
-        "💊 Medication Interaction Checker"
-    )
-
-    st.write(
-        "Enter two medicine names to check for basic known medication interactions."
-    )
-
-    medicine1 = st.text_input(
-        "Enter First Medicine"
-    )
-
-    medicine2 = st.text_input(
-        "Enter Second Medicine"
-    )
-
-    if st.button(
-        "Check Interaction"
-    ):
-
-        if medicine1 and medicine2:
-
-            result = check_medication_interaction(
-                medicine1,
-                medicine2
+            st.write(
+                "👣 Steps"
             )
 
-            st.warning(
-                result
+            st.progress(
+                int(progress["steps"]) / 100
             )
 
-        else:
+            st.write(
+                f"{progress['steps']:.1f}%"
+            )
 
-            st.warning(
-                "Please enter both medicine names."
+
+        with col2:
+
+            st.write(
+                "💧 Water"
+            )
+
+            st.progress(
+                int(progress["water"]) / 100
+            )
+
+            st.write(
+                f"{progress['water']:.1f}%"
+            )
+
+
+        with col3:
+
+            st.write(
+                "🔥 Calories"
+            )
+
+            st.progress(
+                int(progress["calories"]) / 100
+            )
+
+            st.write(
+                f"{progress['calories']:.1f}%"
             )
 
 
@@ -752,146 +899,131 @@ elif menu == "Health Report":
         "📄 Health Report"
     )
 
-    st.write(
-        "Generate a simple summary of your health and fitness data."
-    )
 
-    if st.button(
-        "Generate Health Report"
-    ):
+    fitness_data = view_fitness()
 
-        fitness_data = view_fitness()
+    medicines = view_medicines()
 
-        medicines = view_medicines()
 
-        if fitness_data:
+    if fitness_data:
 
-            report = generate_health_report(
-                fitness_data,
-                medicines
-            )
+        report = generate_health_report(
+            fitness_data,
+            medicines
+        )
 
-            st.subheader(
-                "📊 Your Health Summary"
-            )
 
-            st.write(
-                report
-            )
+        st.text_area(
+            "Generated Health Report",
+            report,
+            height=500
+        )
 
-            st.success(
-                "Health report generated successfully!"
-            )
 
-        else:
+        st.download_button(
+            label="📥 Download Health Report",
+            data=report,
+            file_name="health_report.txt",
+            mime="text/plain"
+        )
 
-            st.warning(
-                "No fitness data available. "
-                "Please enter fitness data first."
-            )
+
+    else:
+
+        st.info(
+            "No fitness data available. "
+            "Please add fitness data first."
+        )
 
 
 # ============================================================
 # HEALTH DATA IMPORT / EXPORT
 # ============================================================
 
-elif menu == "Health Data Import/Export":
+elif menu == "Health Data":
 
     st.header(
-        "📂 Health Data Import / Export"
+        "📂 Health Data Management"
     )
 
-    st.write(
-        "Export or import your health data using JSON, CSV, and XML formats."
-    )
-
-
-    # ========================================================
-    # GET FITNESS DATA
-    # ========================================================
 
     fitness_data = view_fitness()
 
 
-    # ========================================================
-    # EXPORT DATA
-    # ========================================================
+    # --------------------------------------------------------
+    # EXPORT
+    # --------------------------------------------------------
 
     st.subheader(
         "📤 Export Health Data"
     )
 
-    export_format = st.selectbox(
-        "Choose Export Format",
-        [
-            "JSON",
-            "CSV",
-            "XML"
-        ]
-    )
+
+    if fitness_data:
+
+        col1, col2, col3 = st.columns(3)
 
 
-    if st.button(
-        "Prepare Health Data"
-    ):
+        with col1:
 
-        if fitness_data:
+            json_data = export_json(
+                fitness_data
+            )
 
-            if export_format == "JSON":
-
-                file_data = export_json(
-                    fitness_data
-                )
-
-                st.download_button(
-                    label="⬇️ Download JSON",
-                    data=file_data,
-                    file_name="health_data.json",
-                    mime="application/json"
-                )
-
-
-            elif export_format == "CSV":
-
-                file_data = export_csv(
-                    fitness_data
-                )
-
-                st.download_button(
-                    label="⬇️ Download CSV",
-                    data=file_data,
-                    file_name="health_data.csv",
-                    mime="text/csv"
-                )
-
-
-            elif export_format == "XML":
-
-                file_data = export_xml(
-                    fitness_data
-                )
-
-                st.download_button(
-                    label="⬇️ Download XML",
-                    data=file_data,
-                    file_name="health_data.xml",
-                    mime="application/xml"
-                )
-
-        else:
-
-            st.warning(
-                "No health data available to export."
+            st.download_button(
+                "Download JSON",
+                json_data,
+                "health_data.json",
+                "application/json"
             )
 
 
-    # ========================================================
-    # IMPORT DATA
-    # ========================================================
+        with col2:
+
+            csv_data = export_csv(
+                fitness_data
+            )
+
+            st.download_button(
+                "Download CSV",
+                csv_data,
+                "health_data.csv",
+                "text/csv"
+            )
+
+
+        with col3:
+
+            xml_data = export_xml(
+                fitness_data
+            )
+
+            st.download_button(
+                "Download XML",
+                xml_data,
+                "health_data.xml",
+                "application/xml"
+            )
+
+
+    else:
+
+        st.info(
+            "No health data available for export."
+        )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # IMPORT
+    # --------------------------------------------------------
 
     st.subheader(
         "📥 Import Health Data"
     )
+
 
     uploaded_file = st.file_uploader(
         "Upload JSON, CSV, or XML file",
@@ -906,6 +1038,7 @@ elif menu == "Health Data Import/Export":
     if uploaded_file:
 
         file_name = uploaded_file.name.lower()
+
 
         try:
 
@@ -936,28 +1069,15 @@ elif menu == "Health Data Import/Export":
                 )
 
 
-            else:
-
-                st.error(
-                    "Unsupported file format."
-                )
-
-                imported_data = None
+            st.success(
+                "Health data imported successfully!"
+            )
 
 
-            if imported_data is not None:
+            st.write(
+                imported_data
+            )
 
-                st.success(
-                    "Health data imported successfully!"
-                )
-
-                st.subheader(
-                    "📋 Imported Health Data"
-                )
-
-                st.write(
-                    imported_data
-                )
 
         except Exception as e:
 
@@ -976,14 +1096,17 @@ elif menu == "Health Chatbot":
         "🤖 AI Health Chatbot"
     )
 
+
     st.write(
         "Ask a general health or wellness question "
         "and get assistance from our AI Health Assistant."
     )
 
+
     question = st.text_input(
         "Ask your health question"
     )
+
 
     if st.button(
         "Ask AI Assistant"
@@ -997,24 +1120,29 @@ elif menu == "Health Chatbot":
                     "GEMINI_API_KEY"
                 ]
 
+
                 answer = health_chatbot(
                     question,
                     api_key
                 )
 
+
                 st.subheader(
                     "🤖 AI Health Assistant"
                 )
 
+
                 st.write(
                     answer
                 )
+
 
             except Exception as e:
 
                 st.error(
                     f"Unable to connect to AI Health Assistant: {e}"
                 )
+
 
         else:
 
@@ -1033,8 +1161,10 @@ elif menu == "Logout":
 
     st.session_state.page = "Login"
 
+
     st.success(
         "Logged out successfully!"
     )
+
 
     st.rerun()
