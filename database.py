@@ -1,12 +1,10 @@
 import sqlite3
 
-
 # ============================================================
 # CREATE DATABASE AND TABLES
 # ============================================================
 
 connection = sqlite3.connect("health.db")
-
 cursor = connection.cursor()
 
 
@@ -20,6 +18,21 @@ CREATE TABLE IF NOT EXISTS medicines(
     medicine_name TEXT,
     dosage TEXT,
     time TEXT
+)
+""")
+
+
+# ============================================================
+# MEDICATION ADHERENCE TABLE
+# ============================================================
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS medication_adherence(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    medicine_id INTEGER,
+    date TEXT,
+    status TEXT,
+    FOREIGN KEY (medicine_id) REFERENCES medicines(id)
 )
 """)
 
@@ -66,13 +79,24 @@ CREATE TABLE IF NOT EXISTS health_goals(
 
 
 # ============================================================
+# CAREGIVERS TABLE
+# ============================================================
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS caregivers(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    caregiver_name TEXT,
+    caregiver_contact TEXT
+)
+""")
+
+
+# ============================================================
 # SAVE CHANGES
 # ============================================================
 
 connection.commit()
-
 connection.close()
-
 
 print("Database Created Successfully")
 
@@ -83,9 +107,7 @@ print("Database Created Successfully")
 
 def view_fitness():
 
-    connection = sqlite3.connect(
-        "health.db"
-    )
+    connection = sqlite3.connect("health.db")
 
     cursor = connection.cursor()
 
