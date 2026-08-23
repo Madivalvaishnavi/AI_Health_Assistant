@@ -6,7 +6,10 @@ from medicine import (
     view_medicines,
     mark_medication_status,
     view_today_adherence,
-    calculate_adherence
+    calculate_adherence,
+    delete_medicine,
+    complete_medicine,
+    view_medication_history
 )
 
 from caregiver import (
@@ -15,19 +18,31 @@ from caregiver import (
 )
 
 from health_chatbot import health_chatbot
-from health_api import get_steps, get_calories, get_water
-from user import register_user, login_user
+
+from health_api import (
+    get_steps,
+    get_calories,
+    get_water
+)
+
+from user import (
+    register_user,
+    login_user
+)
 
 from database import view_fitness
 
 from health_analysis import (
     analyze_fitness_data,
-    create_fitness_chart
+    create_fitness_chart,
+    create_calories_chart,
+    create_water_chart
 )
 
 from health_goals import (
     get_health_goal_progress,
-    get_goal_status
+    get_goal_status,
+    get_goal_analytics
 )
 
 from health_report import (
@@ -43,6 +58,10 @@ from health_data_formats import (
     import_xml
 )
 
+from health_risk import (
+    calculate_health_risk
+)
+
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -52,12 +71,6 @@ st.set_page_config(
     page_title="AI Health Assistant",
     page_icon="🩺",
     layout="wide"
-)
-
-st.title("🩺 AI Personal Health Assistant")
-
-st.write(
-    "Welcome to your AI-powered personal health monitoring assistant!"
 )
 
 
@@ -78,11 +91,9 @@ if "logged_in" not in st.session_state:
 
 if not st.session_state.logged_in:
 
-    # ========================================================
-    # REGISTER
-    # ========================================================
-
     if st.session_state.page == "Register":
+
+        st.title("🩺 AI Personal Health Assistant")
 
         st.header("📝 User Registration")
 
@@ -93,7 +104,10 @@ if not st.session_state.logged_in:
             type="password"
         )
 
-        if st.button("Register"):
+        if st.button(
+            "Register",
+            use_container_width=True
+        ):
 
             if username.strip() and password.strip():
 
@@ -119,18 +133,19 @@ if not st.session_state.logged_in:
                     "Please enter username and password."
                 )
 
-        if st.button("Go to Login"):
+        if st.button(
+            "Go to Login",
+            use_container_width=True
+        ):
 
             st.session_state.page = "Login"
 
             st.rerun()
 
 
-    # ========================================================
-    # LOGIN
-    # ========================================================
-
     elif st.session_state.page == "Login":
+
+        st.title("🩺 AI Personal Health Assistant")
 
         st.header("🔐 User Login")
 
@@ -141,7 +156,10 @@ if not st.session_state.logged_in:
             type="password"
         )
 
-        if st.button("Login"):
+        if st.button(
+            "Login",
+            use_container_width=True
+        ):
 
             user = login_user(
                 username,
@@ -164,13 +182,29 @@ if not st.session_state.logged_in:
                     "Invalid Username or Password"
                 )
 
-        if st.button("Go to Register"):
+        if st.button(
+            "Go to Register",
+            use_container_width=True
+        ):
 
             st.session_state.page = "Register"
 
             st.rerun()
 
     st.stop()
+
+
+# ============================================================
+# APPLICATION TITLE
+# ============================================================
+
+st.title(
+    "🩺 AI Personal Health Assistant"
+)
+
+st.write(
+    "Welcome to your AI-powered personal health monitoring assistant!"
+)
 
 
 # ============================================================
@@ -182,8 +216,10 @@ menu = st.sidebar.selectbox(
     [
         "Home",
         "Medication Tracker",
+        "Medication Interaction",
         "Fitness Tracker",
         "Health Goals",
+        "Health Risk & Alerts",
         "Health Report",
         "Health Data",
         "Family & Caregiver",
@@ -207,15 +243,27 @@ if menu == "Home":
         "Your complete health overview in one place."
     )
 
+    # --------------------------------------------------------
+    # GET CURRENT DATA
+    # --------------------------------------------------------
+
     steps = get_steps()
+
     calories = get_calories()
+
     water = get_water()
 
+    adherence = calculate_adherence()
+
     fitness_data = view_fitness()
+
     medicines = view_medicines()
 
+    caregivers = view_caregivers()
+
+
     # --------------------------------------------------------
-    # FITNESS SUMMARY
+    # TODAY'S HEALTH SUMMARY
     # --------------------------------------------------------
 
     st.subheader(
@@ -225,33 +273,142 @@ if menu == "Home":
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
+
         st.metric(
             "👣 Steps",
             steps
         )
 
     with col2:
+
         st.metric(
             "🔥 Calories",
             calories
         )
 
     with col3:
+
         st.metric(
             "💧 Water",
             f"{water} L"
         )
 
     with col4:
+
         st.metric(
-            "💊 Medicines",
-            len(medicines)
+            "💊 Medication Adherence",
+            f"{adherence:.1f}%"
         )
 
     st.divider()
 
+
     # --------------------------------------------------------
-    # HEALTH GOALS
+    # HEALTH RISK OVERVIEW
+    # --------------------------------------------------------
+
+    st.subheader(
+        "🚨 Overall Health Risk"
+    )
+
+    risk_level, risk_score, warnings = calculate_health_risk(
+        steps,
+        water,
+        calories,
+        adherence
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        if "High" in risk_level:
+
+            st.error(
+                f"🔴 {risk_level}"
+            )
+
+        elif "Moderate" in risk_level:
+
+            st.warning(
+                f"🟠 {risk_level}"
+            )
+
+        else:
+
+            st.success(
+                f"🟢 {risk_level}"
+            )
+
+    with col2:
+
+        st.metric(
+            "📊 Risk Score",
+            risk_score
+        )
+
+    if warnings:
+
+        st.subheader(
+            "⚠️ Health Warnings"
+        )
+
+        for warning in warnings:
+
+            st.warning(
+                warning
+            )
+
+    else:
+
+        st.success(
+            "✅ No major health warnings detected "
+            "from the available data."
+        )
+
+    # --------------------------------------------------------
+    # QUICK RECOMMENDATION
+    # --------------------------------------------------------
+
+    st.subheader(
+        "💡 Quick Recommendation"
+    )
+
+    if "High" in risk_level:
+
+        st.error(
+            "🚨 Several health indicators require attention. "
+            "Improve your daily health habits and consult "
+            "a qualified healthcare professional for "
+            "personal medical concerns."
+        )
+
+    elif "Moderate" in risk_level:
+
+        st.warning(
+            "⚠️ Some health indicators could be improved. "
+            "Try to increase physical activity, maintain "
+            "adequate hydration, and follow your medication routine."
+        )
+
+    else:
+
+        st.success(
+            "✅ Your recorded health indicators are currently "
+            "within the basic ranges used by this educational system. "
+            "Continue maintaining healthy habits."
+        )
+
+    st.caption(
+        "⚠️ Health risk information is educational only "
+        "and is not a medical diagnosis."
+    )
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # DAILY HEALTH GOALS
     # --------------------------------------------------------
 
     st.subheader(
@@ -259,7 +416,9 @@ if menu == "Home":
     )
 
     steps_goal = 10000
+
     water_goal = 3
+
     calories_goal = 500
 
     progress = get_health_goal_progress(
@@ -271,14 +430,30 @@ if menu == "Home":
         calories_goal
     )
 
+    overall_progress = (
+        progress["steps"]
+        + progress["water"]
+        + progress["calories"]
+    ) / 3
+
+    st.metric(
+        "🌟 Overall Goal Progress",
+        f"{overall_progress:.1f}%"
+    )
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
 
-        st.write("👣 Steps Goal")
+        st.write(
+            "👣 Steps Goal"
+        )
 
         st.progress(
-            int(progress["steps"]) / 100
+            min(
+                int(progress["steps"]),
+                100
+            ) / 100
         )
 
         st.write(
@@ -294,10 +469,15 @@ if menu == "Home":
 
     with col2:
 
-        st.write("💧 Water Goal")
+        st.write(
+            "💧 Water Goal"
+        )
 
         st.progress(
-            int(progress["water"]) / 100
+            min(
+                int(progress["water"]),
+                100
+            ) / 100
         )
 
         st.write(
@@ -313,10 +493,15 @@ if menu == "Home":
 
     with col3:
 
-        st.write("🔥 Calories Goal")
+        st.write(
+            "🔥 Calories Goal"
+        )
 
         st.progress(
-            int(progress["calories"]) / 100
+            min(
+                int(progress["calories"]),
+                100
+            ) / 100
         )
 
         st.write(
@@ -331,6 +516,7 @@ if menu == "Home":
         )
 
     st.divider()
+
 
     # --------------------------------------------------------
     # HEALTH INSIGHTS
@@ -348,7 +534,9 @@ if menu == "Home":
 
         for insight in insights:
 
-            st.info(insight)
+            st.info(
+                insight
+            )
 
     else:
 
@@ -357,6 +545,7 @@ if menu == "Home":
         )
 
     st.divider()
+
 
     # --------------------------------------------------------
     # MEDICATION SUMMARY
@@ -370,7 +559,7 @@ if menu == "Home":
 
         st.write(
             f"You currently have "
-            f"**{len(medicines)} medicine(s)** saved."
+            f"*{len(medicines)} active medicine(s)* saved."
         )
 
         for medicine in medicines:
@@ -384,27 +573,11 @@ if menu == "Home":
     else:
 
         st.info(
-            "No medicines have been saved yet."
+            "No active medicines have been saved yet."
         )
 
     st.divider()
 
-    # --------------------------------------------------------
-    # MEDICATION ADHERENCE
-    # --------------------------------------------------------
-
-    st.subheader(
-        "💊 Medication Adherence"
-    )
-
-    adherence = calculate_adherence()
-
-    st.metric(
-        "Today's Medication Adherence",
-        f"{adherence:.1f}%"
-    )
-
-    st.divider()
 
     # --------------------------------------------------------
     # CAREGIVER SUMMARY
@@ -412,22 +585,30 @@ if menu == "Home":
 
     st.subheader(
         "👨‍👩‍👧 Family & Caregiver"
-
     )
-
-    caregivers = view_caregivers()
 
     if caregivers:
 
         st.write(
-            f"**{len(caregivers)} caregiver(s)** registered."
+            f"👨‍👩‍👧 {len(caregivers)} caregiver(s) registered."
         )
 
-        for caregiver in caregivers:
+        if "High" in risk_level:
 
-            st.write(
-                f"👤 {caregiver[1]} | "
-                f"📞 {caregiver[2]}"
+            st.error(
+                "🚨 Caregiver Attention Required"
+            )
+
+        elif "Moderate" in risk_level:
+
+            st.warning(
+                "⚠️ Caregiver Monitoring Recommended"
+            )
+
+        else:
+
+            st.success(
+                "🟢 No Immediate Caregiver Action Required"
             )
 
     else:
@@ -437,6 +618,7 @@ if menu == "Home":
         )
 
     st.divider()
+
 
     # --------------------------------------------------------
     # HEALTH REPORT
@@ -489,24 +671,25 @@ elif menu == "Medication Tracker":
         "Dosage"
     )
 
-    time = st.text_input(
+    medicine_time = st.text_input(
         "Time"
     )
 
     if st.button(
-        "💾 Save Medicine"
+        "💾 Save Medicine",
+        use_container_width=True
     ):
 
         if (
             medicine_name.strip()
             and dosage.strip()
-            and time.strip()
+            and medicine_time.strip()
         ):
 
             add_medicine(
                 medicine_name,
                 dosage,
-                time
+                medicine_time
             )
 
             st.success(
@@ -523,10 +706,6 @@ elif menu == "Medication Tracker":
 
     st.divider()
 
-    # --------------------------------------------------------
-    # SAVED MEDICINES
-    # --------------------------------------------------------
-
     st.subheader(
         "📋 Saved Medicines"
     )
@@ -537,23 +716,67 @@ elif menu == "Medication Tracker":
 
         for medicine in medicines:
 
-            st.write(
-                f"💊 {medicine[1]} | "
-                f"Dosage: {medicine[2]} | "
-                f"Time: {medicine[3]}"
+            medicine_id = medicine[0]
+
+            medicine_name = medicine[1]
+
+            dosage = medicine[2]
+
+            medicine_time = medicine[3]
+
+            col1, col2, col3 = st.columns(
+                [5, 1, 1]
             )
+
+            with col1:
+
+                st.write(
+                    f"💊 *{medicine_name}* | "
+                    f"Dosage: {dosage} | "
+                    f"⏰ {medicine_time}"
+                )
+
+            with col2:
+
+                if st.button(
+                    "✅ Complete",
+                    key=f"complete_{medicine_id}"
+                ):
+
+                    complete_medicine(
+                        medicine_id
+                    )
+
+                    st.success(
+                        f"{medicine_name} marked as completed."
+                    )
+
+                    st.rerun()
+
+            with col3:
+
+                if st.button(
+                    "🗑️ Delete",
+                    key=f"delete_{medicine_id}"
+                ):
+
+                    delete_medicine(
+                        medicine_id
+                    )
+
+                    st.success(
+                        f"{medicine_name} deleted successfully."
+                    )
+
+                    st.rerun()
 
     else:
 
         st.info(
-            "No medicines saved yet."
+            "No active medicines saved yet."
         )
 
     st.divider()
-
-    # --------------------------------------------------------
-    # MEDICATION ADHERENCE
-    # --------------------------------------------------------
 
     st.subheader(
         "💊 Medication Adherence Monitoring"
@@ -567,10 +790,18 @@ elif menu == "Medication Tracker":
 
         for medicine in medicines:
 
+            medicine_id = medicine[0]
+
+            medicine_name = medicine[1]
+
+            dosage = medicine[2]
+
+            medicine_time = medicine[3]
+
             st.write(
-                f"💊 **{medicine[1]}** | "
-                f"{medicine[2]} | "
-                f"⏰ {medicine[3]}"
+                f"💊 *{medicine_name}* | "
+                f"{dosage} | "
+                f"⏰ {medicine_time}"
             )
 
             col1, col2 = st.columns(2)
@@ -579,16 +810,16 @@ elif menu == "Medication Tracker":
 
                 if st.button(
                     "✅ Taken",
-                    key=f"taken_{medicine[0]}"
+                    key=f"taken_{medicine_id}"
                 ):
 
                     mark_medication_status(
-                        medicine[0],
+                        medicine_id,
                         "Taken"
                     )
 
                     st.success(
-                        f"{medicine[1]} marked as Taken."
+                        f"{medicine_name} marked as Taken."
                     )
 
                     st.rerun()
@@ -597,21 +828,19 @@ elif menu == "Medication Tracker":
 
                 if st.button(
                     "❌ Missed",
-                    key=f"missed_{medicine[0]}"
+                    key=f"missed_{medicine_id}"
                 ):
 
                     mark_medication_status(
-                        medicine[0],
+                        medicine_id,
                         "Missed"
                     )
 
                     st.warning(
-                        f"{medicine[1]} marked as Missed."
+                        f"{medicine_name} marked as Missed."
                     )
 
                     st.rerun()
-
-            st.divider()
 
     else:
 
@@ -619,9 +848,7 @@ elif menu == "Medication Tracker":
             "Add a medicine first to track adherence."
         )
 
-    # --------------------------------------------------------
-    # ADHERENCE PERCENTAGE
-    # --------------------------------------------------------
+    st.divider()
 
     st.subheader(
         "📊 Today's Medication Adherence"
@@ -630,11 +857,14 @@ elif menu == "Medication Tracker":
     adherence = calculate_adherence()
 
     st.progress(
-        int(adherence) / 100
+        min(
+            int(adherence),
+            100
+        ) / 100
     )
 
     st.write(
-        f"💊 Adherence: **{adherence:.1f}%**"
+        f"💊 Adherence: *{adherence:.1f}%*"
     )
 
     adherence_records = view_today_adherence()
@@ -648,25 +878,215 @@ elif menu == "Medication Tracker":
         for record in adherence_records:
 
             medicine_name = record[1]
+
             dosage = record[2]
-            time = record[3]
+
+            medicine_time = record[3]
+
             status = record[4]
 
             if status == "Taken":
 
                 st.success(
                     f"💊 {medicine_name} | "
-                    f"{dosage} | {time} | "
+                    f"{dosage} | "
+                    f"{medicine_time} | "
                     f"✅ {status}"
+                )
+
+            elif status == "Missed":
+
+                st.error(
+                    f"💊 {medicine_name} | "
+                    f"{dosage} | "
+                    f"{medicine_time} | "
+                    f"❌ {status}"
                 )
 
             else:
 
-                st.error(
+                st.warning(
                     f"💊 {medicine_name} | "
-                    f"{dosage} | {time} | "
-                    f"❌ {status}"
+                    f"{dosage} | "
+                    f"{medicine_time} | "
+                    f"⏳ {status}"
                 )
+
+    st.divider()
+
+    st.subheader(
+        "📜 Medication Adherence History"
+    )
+
+    history = view_medication_history()
+
+    if history:
+
+        history_data = []
+
+        for record in history:
+
+            history_data.append(
+                {
+                    "Date": record[4],
+                    "Medicine": record[1],
+                    "Dosage": record[2],
+                    "Time": record[3],
+                    "Status": (
+                        "✅ Taken"
+                        if record[5] == "Taken"
+                        else "❌ Missed"
+                    )
+                }
+            )
+
+        st.dataframe(
+            history_data,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.subheader(
+            "📊 Overall Medication Adherence"
+        )
+
+        total_records = len(history)
+
+        taken_records = sum(
+            1
+            for record in history
+            if record[5] == "Taken"
+        )
+
+        missed_records = sum(
+            1
+            for record in history
+            if record[5] == "Missed"
+        )
+
+        if total_records > 0:
+
+            overall_adherence = (
+                taken_records / total_records
+            ) * 100
+
+        else:
+
+            overall_adherence = 0
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+
+            st.metric(
+                "Total Records",
+                total_records
+            )
+
+        with col2:
+
+            st.metric(
+                "✅ Taken",
+                taken_records
+            )
+
+        with col3:
+
+            st.metric(
+                "❌ Missed",
+                missed_records
+            )
+
+        with col4:
+
+            st.metric(
+                "📊 Adherence",
+                f"{overall_adherence:.1f}%"
+            )
+
+    else:
+
+        st.info(
+            "No medication history available yet."
+        )
+
+
+# ============================================================
+# MEDICATION INTERACTION
+# ============================================================
+
+elif menu == "Medication Interaction":
+
+    st.header(
+        "💊 Medication Interaction Checker"
+    )
+
+    st.write(
+        "Check basic known interactions between two medicines."
+    )
+
+    st.warning(
+        "⚠️ This tool is for educational purposes only. "
+        "It does not replace advice from a doctor or pharmacist."
+    )
+
+    st.divider()
+
+    medicine1 = st.text_input(
+        "💊 Medicine 1",
+        placeholder="Example: Warfarin"
+    )
+
+    medicine2 = st.text_input(
+        "💊 Medicine 2",
+        placeholder="Example: Aspirin"
+    )
+
+    if st.button(
+        "🔍 Check Interaction",
+        use_container_width=True
+    ):
+
+        if medicine1.strip() and medicine2.strip():
+
+            try:
+
+                from medication_interaction import (
+                    check_medication_interaction
+                )
+
+                result = check_medication_interaction(
+                    medicine1,
+                    medicine2
+                )
+
+                st.subheader(
+                    "📋 Interaction Result"
+                )
+
+                if "Potential Medication Interaction" in result:
+
+                    st.error(result)
+
+                elif "same medicine" in result.lower():
+
+                    st.warning(result)
+
+                else:
+
+                    st.info(result)
+
+            except Exception as e:
+
+                st.error(
+                    f"Unable to check interaction: {e}"
+                )
+
+        else:
+
+            st.warning(
+                "Please enter both medicine names."
+            )
 
 
 # ============================================================
@@ -702,7 +1122,8 @@ elif menu == "Fitness Tracker":
     )
 
     if st.button(
-        "Save Fitness Data"
+        "💾 Save Fitness Data",
+        use_container_width=True
     ):
 
         connection = sqlite3.connect(
@@ -725,6 +1146,7 @@ elif menu == "Fitness Tracker":
         )
 
         connection.commit()
+
         connection.close()
 
         st.success(
@@ -734,10 +1156,6 @@ elif menu == "Fitness Tracker":
         st.rerun()
 
     st.divider()
-
-    # --------------------------------------------------------
-    # CURRENT FITNESS DATA
-    # --------------------------------------------------------
 
     st.subheader(
         "📊 Current Fitness Data"
@@ -767,10 +1185,6 @@ elif menu == "Fitness Tracker":
         )
 
     st.divider()
-
-    # --------------------------------------------------------
-    # ANALYSIS
-    # --------------------------------------------------------
 
     fitness_data = view_fitness()
 
@@ -815,17 +1229,56 @@ elif menu == "Fitness Tracker":
 
             st.info(insight)
 
+        st.divider()
+
         st.subheader(
-            "📊 Steps Progress"
+            "📊 Health Data Visualization"
         )
 
-        chart = create_fitness_chart(
+        st.write(
+            "👣 Steps Progress"
+        )
+
+        steps_chart = create_fitness_chart(
             fitness_data
         )
 
-        if chart:
+        if steps_chart:
 
-            st.pyplot(chart)
+            st.pyplot(
+                steps_chart,
+                use_container_width=True
+            )
+
+        st.write(
+            "🔥 Calories Burned Progress"
+        )
+
+        calories_chart = create_calories_chart(
+            fitness_data
+        )
+
+        if calories_chart:
+
+            st.pyplot(
+                calories_chart,
+                use_container_width=True
+            )
+
+        st.write(
+            "💧 Water Intake Progress"
+        )
+
+        water_chart = create_water_chart(
+            fitness_data
+        )
+
+        if water_chart:
+
+            st.pyplot(
+                water_chart,
+                use_container_width=True
+            )
 
         st.subheader(
             "📋 Saved Fitness Records"
@@ -833,7 +1286,9 @@ elif menu == "Fitness Tracker":
 
         for record in fitness_data:
 
-            st.write(record)
+            st.write(
+                record
+            )
 
     else:
 
@@ -878,14 +1333,17 @@ elif menu == "Health Goals":
     )
 
     steps = get_steps()
+
     water = get_water()
+
     calories = get_calories()
 
     if st.button(
-        "Calculate Goal Progress"
+        "📊 Calculate Goal Progress",
+        use_container_width=True
     ):
 
-        progress = get_health_goal_progress(
+        analytics = get_goal_analytics(
             steps,
             steps_goal,
             water,
@@ -895,46 +1353,272 @@ elif menu == "Health Goals":
         )
 
         st.subheader(
-            "📊 Your Progress"
+            "📊 Your Goal Progress"
         )
+
+        st.metric(
+            "🌟 Overall Wellness Progress",
+            f"{analytics['overall']:.1f}%"
+        )
+
+        st.divider()
 
         col1, col2, col3 = st.columns(3)
 
         with col1:
 
-            st.write("👣 Steps")
+            st.write(
+                "👣 Steps"
+            )
 
             st.progress(
-                int(progress["steps"]) / 100
+                min(
+                    int(analytics["steps"]["progress"]),
+                    100
+                ) / 100
             )
 
             st.write(
-                f"{progress['steps']:.1f}%"
+                f"Progress: "
+                f"{analytics['steps']['progress']:.1f}%"
+            )
+
+            st.write(
+                f"Current: {analytics['steps']['current']}"
+            )
+
+            st.write(
+                f"Goal: {analytics['steps']['goal']}"
+            )
+
+            st.write(
+                f"Remaining: {analytics['steps']['remaining']}"
+            )
+
+            st.caption(
+                analytics["steps"]["status"]
             )
 
         with col2:
 
-            st.write("💧 Water")
+            st.write(
+                "💧 Water"
+            )
 
             st.progress(
-                int(progress["water"]) / 100
+                min(
+                    int(analytics["water"]["progress"]),
+                    100
+                ) / 100
             )
 
             st.write(
-                f"{progress['water']:.1f}%"
+                f"Progress: "
+                f"{analytics['water']['progress']:.1f}%"
+            )
+
+            st.write(
+                f"Current: {analytics['water']['current']} L"
+            )
+
+            st.write(
+                f"Goal: {analytics['water']['goal']} L"
+            )
+
+            st.write(
+                f"Remaining: {analytics['water']['remaining']} L"
+            )
+
+            st.caption(
+                analytics["water"]["status"]
             )
 
         with col3:
 
-            st.write("🔥 Calories")
+            st.write(
+                "🔥 Calories"
+            )
 
             st.progress(
-                int(progress["calories"]) / 100
+                min(
+                    int(analytics["calories"]["progress"]),
+                    100
+                ) / 100
             )
 
             st.write(
-                f"{progress['calories']:.1f}%"
+                f"Progress: "
+                f"{analytics['calories']['progress']:.1f}%"
             )
+
+            st.write(
+                f"Current: {analytics['calories']['current']}"
+            )
+
+            st.write(
+                f"Goal: {analytics['calories']['goal']}"
+            )
+
+            st.write(
+                f"Remaining: {analytics['calories']['remaining']}"
+            )
+
+            st.caption(
+                analytics["calories"]["status"]
+            )
+
+
+# ============================================================
+# HEALTH RISK & ALERTS
+# ============================================================
+
+elif menu == "Health Risk & Alerts":
+
+    st.header(
+        "🚨 Health Risk & Alerts"
+    )
+
+    st.write(
+        "Automatically analyze your current fitness "
+        "and medication data to identify basic health risks."
+    )
+
+    st.warning(
+        "⚠️ This assessment is for educational purposes only "
+        "and is not a medical diagnosis."
+    )
+
+    st.divider()
+
+    steps = get_steps()
+
+    water = get_water()
+
+    calories = get_calories()
+
+    adherence = calculate_adherence()
+
+    st.subheader(
+        "📊 Current Health Status"
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+
+        st.metric(
+            "👣 Steps",
+            steps
+        )
+
+    with col2:
+
+        st.metric(
+            "💧 Water",
+            f"{water} L"
+        )
+
+    with col3:
+
+        st.metric(
+            "🔥 Calories",
+            calories
+        )
+
+    with col4:
+
+        st.metric(
+            "💊 Medication Adherence",
+            f"{adherence:.1f}%"
+        )
+
+    st.divider()
+
+    risk_level, risk_score, warnings = calculate_health_risk(
+        steps,
+        water,
+        calories,
+        adherence
+    )
+
+    st.subheader(
+        "🚨 Overall Health Risk"
+    )
+
+    if "High" in risk_level:
+
+        st.error(
+            f"{risk_level} | Risk Score: {risk_score}"
+        )
+
+    elif "Moderate" in risk_level:
+
+        st.warning(
+            f"{risk_level} | Risk Score: {risk_score}"
+        )
+
+    else:
+
+        st.success(
+            f"{risk_level} | Risk Score: {risk_score}"
+        )
+
+    st.divider()
+
+    st.subheader(
+        "⚠️ Health Alerts"
+    )
+
+    if warnings:
+
+        for warning in warnings:
+
+            st.warning(
+                warning
+            )
+
+    else:
+
+        st.success(
+            "✅ No major health warnings detected "
+            "from the available data."
+        )
+
+    st.divider()
+
+    st.subheader(
+        "💡 Recommendation"
+    )
+
+    if "High" in risk_level:
+
+        st.error(
+            "Several health indicators require attention. "
+            "Consider improving your daily health habits "
+            "and consult a qualified healthcare professional "
+            "for personal medical concerns."
+        )
+
+    elif "Moderate" in risk_level:
+
+        st.warning(
+            "Some health indicators could be improved. "
+            "Try to increase physical activity, maintain "
+            "adequate hydration, and follow your medication routine."
+        )
+
+    else:
+
+        st.success(
+            "Your recorded health indicators are currently "
+            "within the basic ranges used by this educational system. "
+            "Continue maintaining healthy habits."
+        )
+
+    st.caption(
+        "⚠️ This risk assessment is for educational purposes only "
+        "and is not a medical diagnosis."
+    )
 
 
 # ============================================================
@@ -948,6 +1632,7 @@ elif menu == "Health Report":
     )
 
     fitness_data = view_fitness()
+
     medicines = view_medicines()
 
     if fitness_data:
@@ -1082,11 +1767,17 @@ elif menu == "Health Data":
                     uploaded_file
                 )
 
+            else:
+
+                imported_data = None
+
             st.success(
                 "Health data imported successfully!"
             )
 
-            st.write(imported_data)
+            st.write(
+                imported_data
+            )
 
         except Exception as e:
 
@@ -1106,12 +1797,13 @@ elif menu == "Family & Caregiver":
     )
 
     st.write(
-        "Add a trusted caregiver to monitor important health information."
+        "Add a trusted caregiver and monitor important health information."
     )
 
-    # --------------------------------------------------------
-    # ADD CAREGIVER
-    # --------------------------------------------------------
+    st.warning(
+        "⚠️ Caregiver alerts are based on the health indicators "
+        "available in this educational system."
+    )
 
     st.subheader(
         "➕ Add Caregiver"
@@ -1126,7 +1818,8 @@ elif menu == "Family & Caregiver":
     )
 
     if st.button(
-        "💾 Save Caregiver"
+        "💾 Save Caregiver",
+        use_container_width=True
     ):
 
         if (
@@ -1153,10 +1846,6 @@ elif menu == "Family & Caregiver":
 
     st.divider()
 
-    # --------------------------------------------------------
-    # SAVED CAREGIVERS
-    # --------------------------------------------------------
-
     st.subheader(
         "📋 Saved Caregivers"
     )
@@ -1168,7 +1857,7 @@ elif menu == "Family & Caregiver":
         for caregiver in caregivers:
 
             st.write(
-                f"👤 **{caregiver[1]}** | "
+                f"👤 *{caregiver[1]}* | "
                 f"📞 {caregiver[2]}"
             )
 
@@ -1180,16 +1869,14 @@ elif menu == "Family & Caregiver":
 
     st.divider()
 
-    # --------------------------------------------------------
-    # HEALTH STATUS FOR CAREGIVER
-    # --------------------------------------------------------
-
     st.subheader(
-        "📊 Health Status"
+        "📊 Current Health Status"
     )
 
     steps = get_steps()
+
     calories = get_calories()
+
     water = get_water()
 
     adherence = calculate_adherence()
@@ -1226,12 +1913,70 @@ elif menu == "Family & Caregiver":
 
     st.divider()
 
-    # --------------------------------------------------------
-    # CAREGIVER NOTIFICATION
-    # --------------------------------------------------------
+    st.subheader(
+        "🚨 Caregiver Health Alert"
+    )
+
+    risk_level, risk_score, warnings = calculate_health_risk(
+        steps,
+        water,
+        calories,
+        adherence
+    )
+
+    if "High" in risk_level:
+
+        st.error(
+            f"🚨 HIGH HEALTH RISK | Risk Score: {risk_score}"
+        )
+
+        st.error(
+            "Caregiver attention is recommended."
+        )
+
+    elif "Moderate" in risk_level:
+
+        st.warning(
+            f"⚠️ MODERATE HEALTH RISK | Risk Score: {risk_score}"
+        )
+
+        st.warning(
+            "Caregiver should monitor the user's health indicators."
+        )
+
+    else:
+
+        st.success(
+            f"🟢 LOW HEALTH RISK | Risk Score: {risk_score}"
+        )
+
+        st.success(
+            "No immediate caregiver attention is indicated "
+            "by the available health data."
+        )
+
+    if warnings:
+
+        st.subheader(
+            "⚠️ Reasons for Caregiver Alert"
+        )
+
+        for warning in warnings:
+
+            st.warning(
+                warning
+            )
+
+    else:
+
+        st.info(
+            "No specific health warnings were generated."
+        )
+
+    st.divider()
 
     st.subheader(
-        "🔔 Caregiver Notification"
+        "💊 Medication Monitoring"
     )
 
     if adherence >= 80:
@@ -1245,7 +1990,7 @@ elif menu == "Family & Caregiver":
 
         st.warning(
             "⚠️ Medication adherence is below 80%. "
-            "The caregiver should be informed to check medication routines."
+            "The caregiver should check the medication routine."
         )
 
     else:
@@ -1253,6 +1998,52 @@ elif menu == "Family & Caregiver":
         st.info(
             "ℹ️ No medication adherence records are available yet."
         )
+
+    st.divider()
+
+    st.subheader(
+        "📋 Caregiver Summary"
+    )
+
+    if caregivers:
+
+        st.write(
+            f"👨‍👩‍👧 Registered Caregivers: "
+            f"**{len(caregivers)}**"
+        )
+
+        if "High" in risk_level:
+
+            st.error(
+                "🚨 Caregiver notification status: "
+                "**ATTENTION REQUIRED**"
+            )
+
+        elif "Moderate" in risk_level:
+
+            st.warning(
+                "⚠️ Caregiver notification status: "
+                "**MONITOR REQUIRED**"
+            )
+
+        else:
+
+            st.success(
+                "🟢 Caregiver notification status: "
+                "**NO IMMEDIATE ACTION REQUIRED**"
+            )
+
+    else:
+
+        st.warning(
+            "No caregiver is registered. "
+            "Consider adding a trusted caregiver."
+        )
+
+    st.caption(
+        "⚠️ These alerts are educational and do not replace "
+        "professional medical advice."
+    )
 
 
 # ============================================================
@@ -1275,7 +2066,8 @@ elif menu == "Health Chatbot":
     )
 
     if st.button(
-        "Ask AI Assistant"
+        "🤖 Ask AI Assistant",
+        use_container_width=True
     ):
 
         if question.strip():
@@ -1295,7 +2087,9 @@ elif menu == "Health Chatbot":
                     "🤖 AI Health Assistant"
                 )
 
-                st.write(answer)
+                st.write(
+                    answer
+                )
 
             except Exception as e:
 
