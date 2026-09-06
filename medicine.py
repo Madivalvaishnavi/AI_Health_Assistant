@@ -29,10 +29,11 @@ def create_medicine_table():
     )
     """)
 
-    # Add active column to old databases if it does not exist
+    # Check whether active column already exists
     cursor.execute("PRAGMA table_info(medicines)")
     columns = [column[1] for column in cursor.fetchall()]
 
+    # Add active column to older databases
     if "active" not in columns:
         cursor.execute("""
         ALTER TABLE medicines
@@ -67,7 +68,7 @@ def create_adherence_table():
 
 
 # ============================================================
-# INITIALIZE TABLES
+# INITIALIZE MEDICATION TABLES
 # ============================================================
 
 def initialize_medication_tables():
@@ -87,14 +88,11 @@ def add_medicine(name, dosage, time):
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        """
-        INSERT INTO medicines
-        (medicine_name, dosage, time, active)
-        VALUES (?, ?, ?, 1)
-        """,
-        (name, dosage, time)
-    )
+    cursor.execute("""
+    INSERT INTO medicines
+    (medicine_name, dosage, time, active)
+    VALUES (?, ?, ?, 1)
+    """, (name, dosage, time))
 
     connection.commit()
     connection.close()
@@ -128,8 +126,7 @@ def view_medicines():
 # ============================================================
 # DELETE MEDICINE
 # ============================================================
-# Use this when a medicine was added by mistake.
-# This removes the medicine and its adherence history.
+# Permanently deletes the medicine and its adherence history.
 
 def delete_medicine(medicine_id):
 
@@ -138,28 +135,44 @@ def delete_medicine(medicine_id):
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Delete adherence history first
-    cursor.execute("""
-    DELETE FROM medication_adherence
-    WHERE medicine_id = ?
-    """, (medicine_id,))
+    try:
 
-    # Delete medicine
-    cursor.execute("""
-    DELETE FROM medicines
-    WHERE id = ?
-    """, (medicine_id,))
+        # Delete adherence history first
+        cursor.execute("""
+        DELETE FROM medication_adherence
+        WHERE medicine_id = ?
+        """, (medicine_id,))
 
-    connection.commit()
-    connection.close()
+        # Delete medicine
+        cursor.execute("""
+        DELETE FROM medicines
+        WHERE id = ?
+        """, (medicine_id,))
+
+        deleted = cursor.rowcount
+
+        connection.commit()
+
+        return deleted > 0
+
+    except Exception as e:
+
+        connection.rollback()
+        print("Delete Error:", e)
+
+        return False
+
+    finally:
+
+        connection.close()
 
 
 # ============================================================
 # COMPLETE MEDICINE
 # ============================================================
-# Use this when the medication course is finished.
-# The medicine disappears from the active list,
-# but its adherence history remains in the database.
+# Marks medicine as completed.
+# Medicine disappears from active list,
+# but adherence history remains.
 
 def complete_medicine(medicine_id):
 
@@ -168,14 +181,30 @@ def complete_medicine(medicine_id):
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute("""
-    UPDATE medicines
-    SET active = 0
-    WHERE id = ?
-    """, (medicine_id,))
+    try:
 
-    connection.commit()
-    connection.close()
+        cursor.execute("""
+        UPDATE medicines
+        SET active = 0
+        WHERE id = ?
+        """, (medicine_id,))
+
+        updated = cursor.rowcount
+
+        connection.commit()
+
+        return updated > 0
+
+    except Exception as e:
+
+        connection.rollback()
+        print("Complete Error:", e)
+
+        return False
+
+    finally:
+
+        connection.close()
 
 
 # ============================================================
@@ -191,42 +220,57 @@ def mark_medication_status(medicine_id, status):
 
     today = date.today().isoformat()
 
-    cursor.execute("""
-    SELECT id
-    FROM medication_adherence
-    WHERE medicine_id = ?
-    AND date = ?
-    """, (medicine_id, today))
+    try:
 
-    existing_record = cursor.fetchone()
-
-    if existing_record:
-
+        # Check whether today's record already exists
         cursor.execute("""
-        UPDATE medication_adherence
-        SET status = ?
+        SELECT id
+        FROM medication_adherence
         WHERE medicine_id = ?
         AND date = ?
-        """, (status, medicine_id, today))
+        """, (medicine_id, today))
 
-    else:
+        existing_record = cursor.fetchone()
 
-        cursor.execute("""
-        INSERT INTO medication_adherence
-        (
-            medicine_id,
-            date,
-            status
-        )
-        VALUES (?, ?, ?)
-        """, (
-            medicine_id,
-            today,
-            status
-        ))
+        if existing_record:
 
-    connection.commit()
-    connection.close()
+            cursor.execute("""
+            UPDATE medication_adherence
+            SET status = ?
+            WHERE medicine_id = ?
+            AND date = ?
+            """, (status, medicine_id, today))
+
+        else:
+
+            cursor.execute("""
+            INSERT INTO medication_adherence
+            (
+                medicine_id,
+                date,
+                status
+            )
+            VALUES (?, ?, ?)
+            """, (
+                medicine_id,
+                today,
+                status
+            ))
+
+        connection.commit()
+
+        return True
+
+    except Exception as e:
+
+        connection.rollback()
+        print("Medication Status Error:", e)
+
+        return False
+
+    finally:
+
+        connection.close()
 
 
 # ============================================================
@@ -277,7 +321,7 @@ def calculate_adherence():
 
     today = date.today().isoformat()
 
-    # Count active medicines
+    # Total active medicines
     cursor.execute("""
     SELECT COUNT(*)
     FROM medicines
@@ -286,7 +330,7 @@ def calculate_adherence():
 
     total = cursor.fetchone()[0]
 
-    # Count taken medicines today
+    # Taken medicines
     cursor.execute("""
     SELECT COUNT(*)
     FROM medication_adherence
@@ -322,6 +366,7 @@ def get_adherence_summary():
 
     today = date.today().isoformat()
 
+    # Total active medicines
     cursor.execute("""
     SELECT COUNT(*)
     FROM medicines
@@ -330,6 +375,7 @@ def get_adherence_summary():
 
     total = cursor.fetchone()[0]
 
+    # Taken
     cursor.execute("""
     SELECT COUNT(*)
     FROM medication_adherence
@@ -342,6 +388,7 @@ def get_adherence_summary():
 
     taken = cursor.fetchone()[0]
 
+    # Missed
     cursor.execute("""
     SELECT COUNT(*)
     FROM medication_adherence
@@ -395,7 +442,7 @@ def view_medication_history():
     JOIN medicines
     ON medication_adherence.medicine_id = medicines.id
     ORDER BY medication_adherence.date DESC
-    """)
+    """ )
 
     history = cursor.fetchall()
 

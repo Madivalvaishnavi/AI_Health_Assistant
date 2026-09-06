@@ -1,10 +1,19 @@
 import sqlite3
 
+
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
+
+def get_connection():
+    return sqlite3.connect("health.db")
+
+
 # ============================================================
 # CREATE DATABASE AND TABLES
 # ============================================================
 
-connection = sqlite3.connect("health.db")
+connection = get_connection()
 cursor = connection.cursor()
 
 
@@ -15,11 +24,27 @@ cursor = connection.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS medicines(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    medicine_name TEXT,
-    dosage TEXT,
-    time TEXT
+    medicine_name TEXT NOT NULL,
+    dosage TEXT NOT NULL,
+    time TEXT NOT NULL,
+    active INTEGER DEFAULT 1
 )
 """)
+
+
+# ============================================================
+# ADD ACTIVE COLUMN TO OLD DATABASE
+# ============================================================
+
+cursor.execute("PRAGMA table_info(medicines)")
+medicine_columns = [column[1] for column in cursor.fetchall()]
+
+if "active" not in medicine_columns:
+
+    cursor.execute("""
+    ALTER TABLE medicines
+    ADD COLUMN active INTEGER DEFAULT 1
+    """)
 
 
 # ============================================================
@@ -29,10 +54,12 @@ CREATE TABLE IF NOT EXISTS medicines(
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS medication_adherence(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    medicine_id INTEGER,
-    date TEXT,
-    status TEXT,
-    FOREIGN KEY (medicine_id) REFERENCES medicines(id)
+    medicine_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    status TEXT NOT NULL,
+    UNIQUE(medicine_id, date),
+    FOREIGN KEY (medicine_id)
+    REFERENCES medicines(id)
 )
 """)
 
@@ -102,17 +129,17 @@ print("Database Created Successfully")
 
 
 # ============================================================
-# FUNCTION TO VIEW FITNESS DATA
+# VIEW FITNESS DATA
 # ============================================================
 
 def view_fitness():
 
-    connection = sqlite3.connect("health.db")
-
+    connection = get_connection()
     cursor = connection.cursor()
 
     cursor.execute("""
-    SELECT * FROM fitness
+    SELECT *
+    FROM fitness
     """)
 
     data = cursor.fetchall()
@@ -120,3 +147,46 @@ def view_fitness():
     connection.close()
 
     return data
+
+
+# ============================================================
+# DELETE MEDICINE
+# ============================================================
+# This permanently removes the medicine and
+# all of its medication adherence history.
+
+def delete_medicine_from_database(medicine_id):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+
+        # Delete adherence records first
+        cursor.execute("""
+        DELETE FROM medication_adherence
+        WHERE medicine_id = ?
+        """, (medicine_id,))
+
+        # Delete medicine
+        cursor.execute("""
+        DELETE FROM medicines
+        WHERE id = ?
+        """, (medicine_id,))
+
+        deleted = cursor.rowcount
+
+        connection.commit()
+
+        return deleted > 0
+
+    except Exception as e:
+
+        connection.rollback()
+        print("Database Delete Error:", e)
+
+        return False
+
+    finally:
+
+        connection.close()
