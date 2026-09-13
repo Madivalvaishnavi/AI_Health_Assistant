@@ -1,8 +1,18 @@
 from google import genai
+import time
 
 
-MODEL_NAME = "gemini-3.7-flash"
+# ============================================================
+# GEMINI MODELS
+# ============================================================
 
+PRIMARY_MODEL = "gemini-3.8-flash"
+FALLBACK_MODEL = "gemini-3.5-flash-lite"
+
+
+# ============================================================
+# AI HEALTH CHATBOT
+# ============================================================
 
 def health_chatbot(question, api_key):
 
@@ -46,30 +56,84 @@ This information is for general educational purposes and
 does not replace professional medical advice.
 """
 
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=prompt
-        )
+        # ====================================================
+        # TRY PRIMARY MODEL
+        # ====================================================
 
-        if response and response.text:
-            return response.text.strip()
+        for attempt in range(3):
+
+            try:
+
+                response = client.models.generate_content(
+                    model=PRIMARY_MODEL,
+                    contents=prompt
+                )
+
+                if response and response.text:
+                    return response.text.strip()
+
+            except Exception as e:
+
+                error = str(e)
+
+                if "503" in error or "UNAVAILABLE" in error:
+
+                    if attempt < 2:
+                        time.sleep(2 ** attempt)
+                        continue
+
+                    break
+
+                if "429" in error or "RESOURCE_EXHAUSTED" in error:
+
+                    break
+
+                if "404" in error or "NOT_FOUND" in error:
+
+                    break
+
+                return "Gemini connection error: " + error
+
+        # ====================================================
+        # FALLBACK MODEL
+        # ====================================================
+
+        try:
+
+            response = client.models.generate_content(
+                model=FALLBACK_MODEL,
+                contents=prompt
+            )
+
+            if response and response.text:
+                return response.text.strip()
+
+        except Exception as e:
+
+            error = str(e)
+
+            if "429" in error or "RESOURCE_EXHAUSTED" in error:
+                return (
+                    "Gemini API quota has been reached. "
+                    "Please try again later."
+                )
+
+            if "503" in error or "UNAVAILABLE" in error:
+                return (
+                    "Gemini is temporarily busy right now. "
+                    "Please try again in a few moments."
+                )
+
+            if "404" in error or "NOT_FOUND" in error:
+                return (
+                    "The Gemini model is currently unavailable. "
+                    "Please check the Gemini API configuration."
+                )
+
+            return "Gemini connection error: " + error
 
         return "Sorry, I could not generate a response."
 
     except Exception as e:
 
-        error = str(e)
-
-        if "429" in error or "RESOURCE_EXHAUSTED" in error:
-            return (
-                "The Gemini API quota has been reached or "
-                "the service is temporarily busy. Please try again later."
-            )
-
-        if "404" in error or "NOT_FOUND" in error:
-            return (
-                "The Gemini model is unavailable. "
-                "Please check the Gemini model configuration."
-            )
-
-        return "Gemini connection error: " + error
+        return "Gemini connection error: " + str(e)

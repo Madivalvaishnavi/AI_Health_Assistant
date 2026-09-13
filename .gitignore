@@ -179,4 +179,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Local SQLite database
+health.dbsecrets.toml
 health.db
